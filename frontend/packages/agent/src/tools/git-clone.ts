@@ -63,7 +63,9 @@ export function createGitCloneTool(
       await executor.exec(`mkdir -p ${workDir}/repos`);
 
       // 4. Clone — native SDK path (Daytona) or exec fallback (Docker)
-      if (executor.hasNativeGit?.()) {
+      let useExecFallback = !executor.hasNativeGit?.();
+
+      if (!useExecFallback) {
         try {
           await executor.cloneRepo!(`https://github.com/${params.repo}.git`, clonePath, {
             ref: params.ref,
@@ -72,17 +74,14 @@ export function createGitCloneTool(
           });
         } catch (err) {
           const msg = err instanceof Error ? err.message : String(err);
-          return {
-            content: [
-              {
-                type: "text",
-                text: `Clone failed:\n${msg.replaceAll(token, "[REDACTED]")}`,
-              },
-            ],
-            details: undefined,
-          };
+          console.warn(
+            `[git_clone] Native Daytona clone failed, falling back to exec: ${msg.replaceAll(token, "[REDACTED]")}`,
+          );
+          useExecFallback = true;
         }
-      } else {
+      }
+
+      if (useExecFallback) {
         const cloneUrl = `https://x-access-token:${token}@github.com/${params.repo}.git`;
 
         let cloneCmd: string;
